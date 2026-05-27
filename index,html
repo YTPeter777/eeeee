@@ -1,0 +1,855 @@
+﻿<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>健康 - Apple Health Glassmorphism Extended</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <style>
+        /* 全域 Amoled 流體深色基底 */
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #030305;
+            color: #ffffff;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            overflow-x: hidden;
+        }
+
+        /* ================= 液態玻璃專屬：動態背景光源球 ================= */
+        .ambient-bg {
+            position: fixed;
+            width: 100vw;
+            height: 100vh;
+            top: 0; left: 0;
+            z-index: -1;
+            overflow: hidden;
+            pointer-events: none;
+        }
+        .blob {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(90px);
+            opacity: 0.22;
+            animation: floatMoving 16s infinite alternate cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .blob-red { width: 320px; height: 320px; background: #ff2d55; top: -5%; left: -10%; }
+        .blob-blue { width: 400px; height: 400px; background: #0a84ff; bottom: 10%; right: -15%; animation-delay: -4s; }
+        .blob-purple { width: 300px; height: 300px; background: #bf5af2; top: 40%; left: -20%; animation-delay: -8s; }
+
+        @keyframes floatMoving {
+            0% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(40px, 60px) scale(1.15); }
+            100% { transform: translate(-20px, -30px) scale(0.95); }
+        }
+
+        /* 主容器夾層 */
+        .app-view {
+            width: 100%;
+            max-width: 414px;
+            box-sizing: border-box;
+            padding-bottom: 95px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .page-content {
+            display: none;
+            padding: 0 16px;
+            box-sizing: border-box;
+        }
+
+        .page-content.active {
+            display: block;
+            animation: glassFade 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+
+        @keyframes glassFade {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ================= 頂級液態玻璃模態控制核心 (無重黑邊) ================= */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(25px) saturate(190%);
+            -webkit-backdrop-filter: blur(25px) saturate(190%);
+            border: 1px solid rgba(255, 255, 255, 0.09);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        /* 雙層頂欄樣式 —— 修正對齊與間距 */
+        .ios-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 32px;
+            margin-bottom: 16px;
+        }
+
+        .ios-header .date-sub {
+            font-size: 13px;
+            color: #ff3b30;
+            font-weight: 600;
+            letter-spacing: -0.1px;
+            text-transform: uppercase;
+        }
+
+        .ios-header .title-main {
+            margin: 2px 0 0 0;
+            font-size: 34px;
+            font-weight: 700;
+            letter-spacing: -0.7px;
+        }
+
+        /* 1:1 還原 iOS 官方個人頭像特徵 */
+        .profile-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, rgba(255,255,255,0.15), rgba(255,255,255,0.05));
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            transition: transform 0.2s cubic-bezier(0.1, 0.8, 0.2, 1);
+            overflow: hidden;
+            margin-top: 16px;
+        }
+
+        .profile-btn:active { transform: scale(0.9); }
+        
+        .profile-btn svg {
+            width: 20px;
+            height: 20px;
+            fill: rgba(255, 255, 255, 0.75);
+        }
+
+        .section-title-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 24px;
+            margin-bottom: 12px;
+        }
+
+        .section-title { font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
+        .section-action { font-size: 16px; color: #0a84ff; cursor: pointer; font-weight: 500; }
+
+        /* ================= 12大健康指標卡片矩陣配置 ================= */
+        .grid-layout {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+
+        .card-full {
+            grid-column: span 2;
+            border-radius: 18px;
+            padding: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-sizing: border-box;
+        }
+
+        .card-half {
+            border-radius: 18px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            min-height: 135px;
+            cursor: pointer;
+            box-sizing: border-box;
+            transition: transform 0.2s cubic-bezier(0.1, 0.8, 0.2, 1), background 0.2s;
+        }
+
+        .card-half:active, .card-full:active {
+            transform: scale(0.96);
+            background: rgba(255, 255, 255, 0.09);
+        }
+
+        .card-title { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; }
+        
+        /* 官方流光色彩定義 */
+        .c-red { color: #ff453a; } .c-green { color: #30d158; } .c-blue { color: #0a84ff; }
+        .c-orange { color: #ff9f0a; } .c-purple { color: #bf5af2; } .c-pink { color: #ff375f; }
+        .c-cyan { color: #64d2ff; } .c-yellow { color: #ffd60a; }
+
+        .num-display { font-size: 26px; font-weight: 700; margin-top: 10px; letter-spacing: -0.5px; }
+        .num-display span { font-size: 14px; color: rgba(255,255,255,0.6); font-weight: 500; margin-left: 2px; }
+        .sub-info { font-size: 12px; color: rgba(255,255,255,0.5); margin-top: 4px; }
+
+        /* 動態心電圖 */
+        .ecg-box { width: 100%; height: 25px; margin-top: 6px; position: relative; overflow: hidden; opacity: 0.85; }
+        .ecg-line {
+            width: 200%; height: 100%; position: absolute;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="30" viewBox="0 0 100 30"><path d="M0,15 L40,15 L45,5 L50,25 L55,10 L60,18 L65,15 L100,15" fill="none" stroke="%23ff453a" stroke-width="1.8"/></svg>') repeat-x;
+            animation: ecgWave 1.4s linear infinite;
+        }
+        @keyframes ecgWave { 0% { transform: translate3d(0, 0, 0); } 100% { transform: translate3d(-50%, 0, 0); } }
+
+        /* 重點提示卡片 */
+        .highlight-card {
+            border-radius: 18px;
+            padding: 16px;
+            margin-bottom: 12px;
+            box-sizing: border-box;
+        }
+        .highlight-header { display: flex; justify-content: space-between; font-size: 12px; color: rgba(255,255,255,0.5); font-weight: 600; margin-bottom: 8px; }
+        .highlight-body { font-size: 15px; font-weight: 500; line-height: 1.45; color: #ffffff; }
+        .highlight-body span { color: #ff453a; font-weight: 700; }
+
+        /* ================= 瀏覽分頁：搜尋欄與類別列表 ================= */
+        .ios-search-bar {
+            border-radius: 12px;
+            padding: 11px 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: rgba(255,255,255,0.5);
+            font-size: 16px;
+            margin-bottom: 24px;
+        }
+
+        .browse-list {
+            border-radius: 18px;
+            overflow: hidden;
+        }
+
+        .browse-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 16px;
+            cursor: pointer;
+            border-bottom: 0.5px solid rgba(255, 255, 255, 0.05);
+            transition: background 0.2s;
+        }
+        .browse-item:last-child { border-bottom: none; }
+        .browse-item:active { background: rgba(255, 255, 255, 0.1); }
+
+        .browse-left { display: flex; align-items: center; gap: 14px; font-size: 17px; font-weight: 600; }
+        .icon-circle {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 16px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        .chevron { color: rgba(255,255,255,0.2); font-weight: 700; font-size: 16px; }
+
+        /* ================= 高階液態玻璃 Sheet 彈出控制面 ================= */
+        .ios-sheet-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0, 0, 0, 0.4); opacity: 0; visibility: hidden;
+            transition: opacity 0.35s ease; z-index: 998;
+            backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+        }
+
+        .ios-sheet {
+            position: fixed;
+            bottom: -100%; left: 0; width: 100vw; height: 82vh;
+            border-radius: 24px 24px 0 0;
+            transition: bottom 0.35s cubic-bezier(0.15, 0.85, 0.3, 1);
+            z-index: 999; padding: 24px 20px; box-sizing: border-box;
+            overflow-y: auto;
+        }
+
+        .sheet-active .ios-sheet { bottom: 0; }
+        .sheet-active .ios-sheet-overlay { opacity: 1; visibility: visible; }
+
+        .sheet-handle {
+            width: 40px; height: 5px; background: rgba(255,255,255,0.25);
+            border-radius: 3px; margin: -4px auto 24px auto;
+        }
+        .sheet-header { display: flex; justify-content: space-between; align-items: center; }
+        .sheet-title { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; }
+        .sheet-close { color: #ff453a; font-weight: 600; font-size: 16px; cursor: pointer; }
+
+        /* 專屬：個人檔案卡片內部佈局 */
+        .profile-card-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 20px;
+            gap: 8px;
+        }
+        .profile-large-avatar {
+            width: 76px; height: 76px; border-radius: 50%;
+            background: linear-gradient(135deg, rgba(255,255,255,0.15), rgba(255,255,255,0.03));
+            border: 1px solid rgba(255,255,255,0.3);
+            display: flex; justify-content: center; align-items: center;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+        }
+        .profile-name { font-size: 22px; font-weight: 700; margin-top: 6px; }
+        .profile-email { font-size: 13px; color: rgba(255,255,255,0.5); }
+        
+        .profile-details-list {
+            margin-top: 28px;
+            border-radius: 16px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+        }
+        .profile-detail-item {
+            display: flex; justify-content: space-between; padding: 15px 16px;
+            background: rgba(255,255,255,0.03);
+            border-bottom: 0.5px solid rgba(255,255,255,0.05);
+            font-size: 15px;
+        }
+        .profile-detail-item:last-child { border-bottom: none; }
+        .profile-detail-label { color: rgba(255,255,255,0.6); font-weight: 500; }
+        .profile-detail-val { font-weight: 600; color: #ffffff; }
+
+        /* 玻璃內嵌統計柱狀圖 */
+        .mock-chart {
+            width: 100%; height: 170px; margin-top: 25px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            display: flex; align-items: flex-end; justify-content: space-between; padding: 10px 15px; box-sizing: border-box;
+            background: rgba(0,0,0,0.2); border-radius: 12px;
+        }
+        .chart-bar {
+            width: 26px; background: linear-gradient(180deg, rgba(255,69,58,0.85), rgba(255,69,58,0.15));
+            border-radius: 6px 6px 0 0; height: 0; transition: height 0.65s cubic-bezier(0.1, 0.8, 0.2, 1);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        /* 實時物理偵測畫布組件 */
+        #sensorCanvas {
+            width: 100%; height: 140px; background: rgba(0,0,0,0.3);
+            border-radius: 14px; display: block; margin-top: 15px;
+        }
+        .canvas-meta {
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px; text-align: center;
+        }
+        .canvas-tag {
+            font-size: 13px; background: rgba(255,255,255,0.04); padding: 8px; border-radius: 8px; font-family: monospace;
+        }
+
+        /* ================= 懸浮式底部分頁導航欄 ================= */
+        .ios-tabbar {
+            position: fixed; bottom: 12px; left: 50%;
+            transform: translateX(-50%);
+            width: calc(100% - 24px); max-width: 390px;
+            height: 66px; border-radius: 24px;
+            display: flex; justify-content: center; z-index: 900;
+        }
+        .tabbar-inner {
+            width: 100%; display: flex; justify-content: space-around; align-items: center;
+        }
+        .tab-item {
+            display: flex; flex-direction: column; align-items: center;
+            font-size: 11px; color: rgba(255,255,255,0.4); cursor: pointer; gap: 4px; font-weight: 600;
+            transition: color 0.2s;
+        }
+        .tab-item.active { color: #ff453a; }
+        .tab-icon { font-size: 20px; }
+
+        /* 頂部啟動晶片安全提示條 */
+        .top-sensor-trigger {
+            background: linear-gradient(135deg, rgba(10,132,255,0.15), rgba(191,90,242,0.15));
+            padding: 12px; border-radius: 14px; font-size: 13px; text-align: center;
+            margin-bottom: 16px; cursor: pointer; border: 1px solid rgba(255,255,255,0.08);
+            font-weight: 600; color: #0a84ff; transition: transform 0.2s;
+        }
+        .top-sensor-trigger:active { transform: scale(0.98); }
+    </style>
+</head>
+<body>
+
+    <div class="ambient-bg">
+        <div class="blob blob-red"></div>
+        <div class="blob blob-blue"></div>
+        <div class="blob blob-purple"></div>
+    </div>
+
+    <div class="app-view">
+        
+        <div id="page-summary" class="page-content active">
+            <div class="ios-header">
+                <div class="left-meta">
+                    <div class="date-sub" id="currentDate">5月27日 星期三</div>
+                    <div class="title-main">摘要</div>
+                </div>
+                <div class="profile-btn" onclick="openProfileCenter()">
+                    <svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                </div>
+            </div>
+
+            <div class="top-sensor-trigger" id="hardwareGate" onclick="unlockHardwareSensors()">
+                ⚡ 點擊授權解鎖手機晶片，開啟真實計步偵測
+            </div>
+
+            <div class="section-title-bar">
+                <div class="section-title">我的最愛</div>
+                <div class="section-action">編輯</div>
+            </div>
+
+            <div class="grid-layout">
+                <div class="card-full glass-panel" onclick="openChartSheet('活動三環能效比', [85, 115, 90, 130, 110])">
+                    <div style="display:flex; flex-direction:column; gap:5px;">
+                        <div><span class="c-red">● 活動</span> <span style="font-weight:700; margin-left:6px;">480 / 600 Kcal</span></div>
+                        <div><span class="c-green">● 運動</span> <span style="font-weight:700; margin-left:6px;">24 / 30 Min</span></div>
+                        <div><span class="c-blue">● 站立</span> <span style="font-weight:700; margin-left:6px;">10 / 12 Hr</span></div>
+                    </div>
+                    <svg width="78" height="78" viewBox="0 0 110 110" style="transform: rotate(-90deg); filter: drop-shadow(0 2px 8px rgba(255,45,85,0.3));">
+                        <circle cx="55" cy="55" r="44" stroke="rgba(255,45,85,0.08)" stroke-width="8" fill="none"/>
+                        <circle cx="55" cy="55" r="44" stroke="#ff453a" stroke-width="8" fill="none" stroke-dasharray="276.4" stroke-dashoffset="55" stroke-linecap="round"/>
+                    </svg>
+                </div>
+
+                <div class="card-half glass-panel" onclick="openChartSheet('即時心率波動 (BPM)', [67, 74, 85, 70, 73])">
+                    <div class="card-title c-red">❤️ 心率</div>
+                    <div>
+                        <div class="num-display"><span id="liveBpm">72</span><span>BPM</span></div>
+                        <div class="ecg-box"><div class="ecg-line"></div></div>
+                    </div>
+                </div>
+
+                <div class="card-half glass-panel" onclick="openLiveWaveSheet()">
+                    <div class="card-title c-orange">👟 步數 (真實偵測)</div>
+                    <div>
+                        <div class="num-display"><span id="liveTrueSteps">0</span><span>步</span></div>
+                        <div class="sub-info" id="stepTargetDesc">點擊查看 3軸實時波形</div>
+                    </div>
+                </div>
+
+                <div class="card-half glass-panel" onclick="openChartSheet('睡眠週期時長 (小時)', [6.8, 7.1, 7.5, 7.33, 6.9])">
+                    <div class="card-title c-purple">🌙 睡眠</div>
+                    <div>
+                        <div class="num-display">7<span>h</span>20<span>m</span></div>
+                        <div class="sub-info">昨晚深層修復率高</div>
+                    </div>
+                </div>
+
+                <div class="card-half glass-panel" onclick="addWaterMl(event)">
+                    <div class="card-title c-blue">💧 水分紀錄</div>
+                    <div>
+                        <div class="num-display"><span id="waterText">1250</span><span>/ 2000 ml</span></div>
+                        <div class="sub-info">點擊增加 250ml 水分</div>
+                    </div>
+                </div>
+
+                <div class="card-half glass-panel" onclick="openChartSheet('環境分貝音量監測', [40, 52, 45, 59, 42])">
+                    <div class="card-title c-green">👂 環境音量</div>
+                    <div>
+                        <div class="num-display">42<span>dB</span></div>
+                        <div class="sub-info" style="color:#30d158;">安全優良環境</div>
+                    </div>
+                </div>
+
+                <div class="card-half glass-panel" onclick="openChartSheet('垂直攀爬樓層統計', [4, 9, 14, 7, 10])">
+                    <div class="card-title c-orange">🧗 爬樓梯</div>
+                    <div>
+                        <div class="num-display">14<span>層樓</span></div>
+                        <div class="sub-info">垂直高度 42M</div>
+                    </div>
+                </div>
+
+                <div class="card-half glass-panel" onclick="openSheet('經期與女性健康預測', '當前處於生理週期第 12 天，預測排卵易孕期將在 3 天後開啟。體徵一切平穩。')">
+                    <div class="card-title c-pink">🌸 經期追蹤</div>
+                    <div>
+                        <div class="num-display">第 12<span>天</span></div>
+                        <div class="sub-info">易孕期預測：3天後</div>
+                    </div>
+                </div>
+
+                <div class="card-half glass-panel" onclick="openChartSheet('靜止呼吸頻率監測', [14, 16, 15, 17, 16])">
+                    <div class="card-title c-cyan">🫁 呼吸頻率</div>
+                    <div>
+                        <div class="num-display">16<span>次/分</span></div>
+                        <div class="sub-info">睡眠均速：14 次/分</div>
+                    </div>
+                </div>
+
+                <div class="card-half glass-panel" onclick="openChartSheet('基礎靜態代謝卡路里', [1640, 1680, 1680, 1660, 1680])">
+                    <div class="card-title c-red">🔥 靜態熱量</div>
+                    <div>
+                        <div class="num-display">1,680<span>大卡</span></div>
+                        <div class="sub-info">基礎核心熱量儲備穩定</div>
+                    </div>
+                </div>
+
+                <div class="card-half glass-panel" onclick="openChartSheet('每小時站立標率數', [8, 11, 10, 9, 10])">
+                    <div class="card-title c-green">🧍 站立小時</div>
+                    <div>
+                        <div class="num-display">10<span>/ 12 h</span></div>
+                        <div class="sub-info">目標剩餘 2 小時</div>
+                    </div>
+                </div>
+
+                <div class="card-half glass-panel" onclick="openChartSheet('自主神經心率變異度趨勢', [59, 63, 64, 60, 65])">
+                    <div class="card-title c-yellow">⚡ 心率變異度</div>
+                    <div>
+                        <div class="num-display">64<span>ms</span></div>
+                        <div class="sub-info">神經抗壓健康度：高</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section-title-bar"><div class="section-title">重點</div></div>
+            <div class="highlight-card glass-panel">
+                <div class="highlight-header"><div>步數趨勢分析</div><div>過去 7 天</div></div>
+                <div class="highlight-body">你的每日平均步行總數呈上升趨勢。你內建的晶片工作正常，數據已快取儲存。</div>
+            </div>
+        </div>
+
+        <div id="page-browse" class="page-content">
+            <div class="ios-header">
+                <div class="left-meta">
+                    <div class="date-sub" style="color:rgba(255,255,255,0.5);">類別</div>
+                    <div class="title-main">瀏覽</div>
+                </div>
+                <div class="profile-btn" onclick="openProfileCenter()">
+                    <svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                </div>
+            </div>
+
+            <div class="ios-search-bar glass-panel">
+                <div>🔍 搜尋健康類別</div>
+                <div style="font-size:14px; opacity:0.7;">🎙️</div>
+            </div>
+
+            <div style="font-size: 17px; font-weight: 700; margin-bottom: 12px; padding-left: 4px;">健康類別</div>
+            
+            <div class="browse-list glass-panel">
+                <div class="browse-item" onclick="openSheet('活動', '整合步數、活動能力、步行速度、卡路里消耗等所有動力學數據。')">
+                    <div class="browse-left"><div class="icon-circle" style="background:#ff453a;">🏃‍♂️</div><div>活動</div></div>
+                    <div class="chevron">›</div>
+                </div>
+                <div class="browse-item" onclick="openSheet('身體測量', '追蹤身高、體重、精確體脂肪率、精細身體質量指數 (BMI)。')">
+                    <div class="browse-left"><div class="icon-circle" style="background:#ff9f0a;">📏</div><div>身體測量</div></div>
+                    <div class="chevron">›</div>
+                </div>
+                <div class="browse-item" onclick="openSheet('聽力', '防護監測包含耳機等音量爆音率、外在環境分貝與聲學測試。')">
+                    <div class="browse-left"><div class="icon-circle" style="background:#30d158;">👂</div><div>聽力</div></div>
+                    <div class="chevron">›</div>
+                </div>
+                <div class="browse-item" onclick="openSheet('心臟', '深度匯整包含即時脈搏、靜止心率、心電圖心波走勢、心率變異度 (HRV)。')">
+                    <div class="browse-left"><div class="icon-circle" style="background:#ff375f;">❤️</div><div>心臟</div></div>
+                    <div class="chevron">›</div>
+                </div>
+                <div class="browse-item" onclick="openSheet('藥物', '建立精準臨床服藥提醒、漏服記錄與醫療處方對照歷史。')">
+                    <div class="browse-left"><div class="icon-circle" style="background:#0a84ff;">💊</div><div>藥物</div></div>
+                    <div class="chevron">›</div>
+                </div>
+                <div class="browse-item" onclick="openSheet('正念活動', '深度記錄大腦正念冥想時長、心理呼吸沉澱頻率與放鬆週期。')">
+                    <div class="browse-left"><div class="icon-circle" style="background:#64d2ff;">🧘‍♀️</div><div>正念活動</div></div>
+                    <div class="chevron">›</div>
+                </div>
+                <div class="browse-item" onclick="openSheet('活動能力', '精準量測步行不對稱平衡度、步幅長度與行走雙腳著地支撐時間。')">
+                    <div class="browse-left"><div class="icon-circle" style="background:#ffd60a;">🚶‍♂️</div><div>活動能力</div></div>
+                    <div class="chevron">›</div>
+                </div>
+                <div class="browse-item" onclick="openSheet('營養', '記錄卡路里總攝取、全天候水分平衡、膳食纖維、礦物質及多重維他命。')">
+                    <div class="browse-left"><div class="icon-circle" style="background:#ff9f0a;">🥗</div><div>營養</div></div>
+                    <div class="chevron">›</div>
+                </div>
+                <div class="browse-item" onclick="openSheet('呼吸系統', '包含血液氧氣飽和度 (SpO2)、夜間呼吸頻率、以及最大攝氧量 (VO2 Max)。')">
+                    <div class="browse-left"><div class="icon-circle" style="background:#64d2ff;">🫁</div><div>呼吸系統</div></div>
+                    <div class="chevron">›</div>
+                </div>
+                <div class="browse-item" onclick="openSheet('睡眠', '科學化解析核心睡眠、深層睡眠段、REM 快速動眼期與甦醒頻率。')">
+                    <div class="browse-left"><div class="icon-circle" style="background:#bf5af2;">🌙</div><div>睡眠</div></div>
+                    <div class="chevron">›</div>
+                </div>
+                <div class="browse-item" onclick="openSheet('症狀', '記錄突發性生理發熱、咳嗽、局部頭痛、噁心感等臨床症狀表。')">
+                    <div class="browse-left"><div class="icon-circle" style="background:#8e8e93;">📋</div><div>症狀</div></div>
+                    <div class="chevron">›</div>
+                </div>
+                <div class="browse-item" onclick="openSheet('生命徵象', '臨床專屬追蹤：包含動態血壓、餐後血糖、核心體溫等最關鍵生理徵象。')">
+                    <div class="browse-left"><div class="icon-circle" style="background:#ff453a;">🩸</div><div>生命徵象</div></div>
+                    <div class="chevron">›</div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="ios-sheet-overlay" onclick="closeSheet()"></div>
+    <div class="ios-sheet glass-panel" id="iosSheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-header">
+            <div class="sheet-title" id="sheetTitle">歷史趨勢</div>
+            <div class="sheet-close" onclick="closeSheet()">完成</div>
+        </div>
+        <div id="sheetContent" style="color:rgba(255,255,255,0.7); margin-top:14px; line-height:1.5; font-size:15px; white-space: pre-line;"></div>
+        <div id="chartContainer"></div>
+    </div>
+
+    <div class="ios-tabbar glass-panel">
+        <div class="tabbar-inner">
+            <div class="tab-item active" id="tab-btn-summary" onclick="switchTab('summary')">
+                <span class="tab-icon">📊</span><span>摘要</span>
+            </div>
+            <div class="tab-item" id="tab-btn-browse" onclick="switchTab('browse')">
+                <span class="tab-icon">🔍</span><span>瀏覽</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 設定系統日期格式
+        const dateConfig = { month: 'long', day: 'numeric', weekday: 'long' };
+        document.getElementById('currentDate').innerText = new Date().toLocaleDateString('zh-TW', dateConfig);
+
+        // 高流暢度分頁切換
+        function switchTab(targetTab) {
+            document.querySelectorAll('.page-content').forEach(page => page.classList.remove('active'));
+            document.querySelectorAll('.tab-item').forEach(btn => btn.classList.remove('active'));
+            
+            document.getElementById('page-' + targetTab).classList.add('active');
+            document.getElementById('tab-btn-' + targetTab).classList.add('active');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // 開啟毛玻璃細節視窗
+        function openSheet(title, text) {
+            isWaveActive = false; // 關閉 Canvas 渲染迴圈節省資源
+            document.getElementById('sheetTitle').innerText = title;
+            document.getElementById('sheetContent').innerText = text;
+            document.getElementById('chartContainer').innerHTML = '';
+            document.body.classList.add('sheet-active');
+        }
+
+        // 1:1 復刻全新擬真 Apple 帳戶面板
+        function openProfileCenter() {
+            isWaveActive = false;
+            document.getElementById('sheetTitle').innerText = "健康帳戶";
+            document.getElementById('sheetContent').innerText = "";
+            
+            let profileHtml = `
+                <div class="profile-card-box">
+                    <div class="profile-large-avatar">
+                        <svg viewBox="0 0 24 24" style="width:42px; height:42px; fill:rgba(255,255,255,0.85);"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                    </div>
+                    <div class="profile-name">NC Developer</div>
+                    <div class="profile-email">nc.team.service@icloud.com</div>
+                </div>
+                <div class="profile-details-list">
+                    <div class="profile-detail-item">
+                        <div class="profile-detail-label">健康詳細資訊</div>
+                        <div class="profile-detail-val" style="color:#0a84ff;">已設定 ›</div>
+                    </div>
+                    <div class="profile-detail-item">
+                        <div class="profile-detail-label">器官捐贈</div>
+                        <div class="profile-detail-val">未選擇</div>
+                    </div>
+                    <div class="profile-detail-item">
+                        <div class="profile-detail-label">醫療卡</div>
+                        <div class="profile-detail-val">已啟用</div>
+                    </div>
+                    <div class="profile-detail-item">
+                        <div class="profile-detail-label">開發端核心權限</div>
+                        <div class="profile-detail-val" style="color:#30d158;">NC.Team 高級核准</div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('chartContainer').innerHTML = profileHtml;
+            document.body.classList.add('sheet-active');
+        }
+
+        // 開啟毛玻璃統計圖表
+        function openChartSheet(title, dataPoints) {
+            isWaveActive = false;
+            document.getElementById('sheetTitle').innerText = title;
+            document.getElementById('sheetContent').innerText = "近 5 周期核心生理特徵數據毛玻璃折射圖譜：";
+            
+            let maximum = Math.max(...dataPoints);
+            let barHtml = '<div class="mock-chart">';
+            dataPoints.forEach(val => {
+                let scaledHeight = (val / maximum) * 145;
+                barHtml += `<div class="chart-bar" style="height: 0px;" data-height="${scaledHeight}px"></div>`;
+            });
+            barHtml += '</div>';
+            
+            document.getElementById('chartContainer').innerHTML = barHtml;
+            document.body.classList.add('sheet-active');
+
+            // 觸發流暢柱狀圖伸展
+            setTimeout(() => {
+                document.querySelectorAll('.chart-bar').forEach(bar => {
+                    bar.style.height = bar.getAttribute('data-height');
+                });
+            }, 60);
+        }
+
+        function closeSheet() {
+            document.body.classList.remove('sheet-active');
+            isWaveActive = false;
+        }
+
+        // 獨立加水防干擾機制
+        let waterVolume = 1250;
+        function addWaterMl(event) {
+            event.stopPropagation();
+            waterVolume = waterVolume < 2000 ? waterVolume + 250 : 0;
+            document.getElementById('waterText').innerText = waterVolume;
+        }
+
+        // 心率跳動動態物理演算法
+        setInterval(() => {
+            document.getElementById('liveBpm').innerText = 72 + Math.floor(Math.random() * 5) - 2;
+        }, 1100);
+
+        // ====================================================================
+        // ===================== 核心硬體偵測與動態 Canvas 整合 =====================
+        // ====================================================================
+        
+        let trueSteps = parseInt(localStorage.getItem('apple_health_true_steps')) || 0;
+        let isWaveActive = false;
+        let canvasCtx = null;
+        let waveDataPoints = Array(70).fill(70); // 畫布中心基準線線
+
+        function updateStepUI() {
+            document.getElementById('liveTrueSteps').innerText = trueSteps.toLocaleString();
+            let progressPct = ((trueSteps / 10000) * 100).toFixed(1);
+            document.getElementById('stepTargetDesc').innerText = `今天已達標 ${progressPct}% (目標 10k)`;
+            localStorage.setItem('apple_health_true_steps', trueSteps);
+        }
+        updateStepUI();
+
+        // 解鎖感應器通道
+        function unlockHardwareSensors() {
+            if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+                DeviceMotionEvent.requestPermission()
+                    .then(permission => {
+                        if (permission === 'granted') startSensorListening();
+                        else alert("晶片讀取遭拒絕");
+                    }).catch(console.error);
+            } else {
+                startSensorListening();
+            }
+        }
+
+        function startSensorListening() {
+            document.getElementById('hardwareGate').style.display = 'none';
+            window.addEventListener('devicemotion', onDevicePhysicCaptured, true);
+        }
+
+        let lastSampleTime = 0;
+        let stepDebounceGate = false;
+        let currentX = 0, currentY = 0, currentZ = 0, currentTotalForce = 0;
+
+        function onDevicePhysicCaptured(e) {
+            let acc = e.accelerationIncludingGravity;
+            if(!acc || !acc.x) return;
+
+            let timestamp = Date.now();
+            if((timestamp - lastSampleTime) > 50) { // 50ms 採樣頻率
+                lastSampleTime = timestamp;
+
+                currentX = acc.x; currentY = acc.y; currentZ = acc.z;
+                
+                // 計算空間合力特徵向量
+                let force = Math.sqrt(currentX*currentX + currentY*currentY + currentZ*currentZ) - 9.8;
+                if(Math.abs(force) < 0.3) force = 0;
+                currentTotalForce = force;
+
+                // 物理震動波峰過濾演算法（計步核心）
+                if (Math.abs(currentTotalForce) > 3.4 && !stepDebounceGate) {
+                    trueSteps += 1;
+                    updateStepUI();
+
+                    stepDebounceGate = true;
+                    setTimeout(() => { stepDebounceGate = false; }, 360); // 防止震盪複數疊加
+                }
+            }
+        }
+
+        // 打開專屬實時波形 Sheet 控制面
+        function openLiveWaveSheet() {
+            document.getElementById('sheetTitle').innerText = "3軸重力波形偵測器";
+            document.getElementById('sheetContent').innerText = "拿著手機模擬走路或輕微晃動，下方 Canvas 畫布會即時捕捉加速度晶片的物理回傳特徵值：";
+            
+            let htmlPayload = `
+                <canvas id="sensorCanvas" width="400" height="140"></canvas>
+                <div class="canvas-meta">
+                    <div class="canvas-tag" style="color:#ff453a;">X軸: <span id="lblX">0.0</span></div>
+                    <div class="canvas-tag" style="color:#0a84ff;">Y軸: <span id="lblY">0.0</span></div>
+                    <div class="canvas-tag" style="color:#bf5af2;">衝擊: <span id="lblG">0.0</span>g</div>
+                </div>
+            `;
+            document.getElementById('chartContainer').innerHTML = htmlPayload;
+            document.body.classList.add('sheet-active');
+
+            // 啟動 Canvas 繪圖鏈路
+            const cvs = document.getElementById('sensorCanvas');
+            canvasCtx = cvs.getContext('2d');
+            isWaveActive = true;
+            
+            // 迴圈渲染
+            requestAnimationFrame(renderRealtimeCanvasLoop);
+        }
+
+        function renderRealtimeCanvasLoop() {
+            if(!isWaveActive) return;
+
+            // 即時更新數值標籤
+            const lx = document.getElementById('lblX');
+            const ly = document.getElementById('lblY');
+            const lg = document.getElementById('lblG');
+            if(lx && ly && lg) {
+                lx.innerText = currentX.toFixed(1);
+                ly.innerText = currentY.toFixed(1);
+                lg.innerText = Math.abs(currentTotalForce).toFixed(2);
+            }
+
+            // 清除畫布
+            canvasCtx.clearRect(0, 0, 400, 140);
+
+            // 背景細緻橫向輔助網格
+            canvasCtx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
+            canvasCtx.lineWidth = 1;
+            for(let h = 20; h < 140; h += 20) {
+                canvasCtx.beginPath(); canvasCtx.moveTo(0, h); canvasCtx.lineTo(400, h); canvasCtx.stroke();
+            }
+
+            // 快取推進
+            waveDataPoints.push(70 - (currentTotalForce * 4.5));
+            waveDataPoints.shift();
+
+            // 繪製高飽和發光漸層曲線
+            canvasCtx.beginPath();
+            canvasCtx.lineWidth = 3;
+            
+            let gdt = canvasCtx.createLinearGradient(0, 0, 400, 0);
+            gdt.addColorStop(0, '#0a84ff');
+            gdt.addColorStop(0.5, '#bf5af2');
+            gdt.addColorStop(1, '#ff453a');
+            canvasCtx.strokeStyle = gdt;
+
+            for(let i = 0; i < waveDataPoints.length; i++) {
+                let posX = (400 / (waveDataPoints.length - 1)) * i;
+                let posY = waveDataPoints[i];
+
+                if(posY < 6) posY = 6;
+                if(posY > 134) posY = 134;
+
+                if(i === 0) canvasCtx.moveTo(posX, posY);
+                else canvasCtx.lineTo(posX, posY);
+            }
+            canvasCtx.stroke();
+
+            requestAnimationFrame(renderRealtimeCanvasLoop);
+        }
+    </script>
+</body>
+</html>
